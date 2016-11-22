@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">SMSProducer</string>
+    <string name="address_hint">Type Sync Service URL Here.</string>
+    <string name="publickey_hint">Parse Public Key Here.</string>
+    <string name="config_update_success">Config Updated!</string>
+    <string name="config_update_failed">Update Failed!</string>
+
+</resources>
