@@ -8,6 +8,8 @@ android:
   - extra-android-support
   - extra-android-m2repository
   - android-sdk-license-c81a61d9
+script:
+- ./gradlew :app:assembleRelease
 before_install:
 - openssl aes-256-cbc -K $encrypted_e23e65035bef_key -iv $encrypted_e23e65035bef_iv
   -in luafan.jks.enc -out luafan.jks -d
@@ -18,3 +20,5 @@ deploy:
   file: build/outputs/apk/app-release.apk
   on:
     repo: samchang8826/SMSUpload
+    tags: true
+    all_branches: true
