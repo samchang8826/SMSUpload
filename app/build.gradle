@@ -7,7 +7,7 @@ android {
     lintOptions{
         abortOnError false
     }
-    
+
     defaultConfig {
         applicationId "com.luafan.smsproducer"
         minSdkVersion 8
