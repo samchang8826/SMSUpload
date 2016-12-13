@@ -1,0 +1,18 @@
+language: android
+android:
+  components:
+  - build-tools-23.0.3
+  - android-23
+  - sys-img-armeabi-v7a-android-23
+  - sys-img-armeabi-v7a-android-22
+  - sys-img-armeabi-v7a-android-8
+before_install:
+- openssl aes-256-cbc -K $encrypted_e23e65035bef_key -iv $encrypted_e23e65035bef_iv
+  -in luafan.jks.enc -out luafan.jks -d
+deploy:
+  provider: releases
+  api_key:
+    secure: Z/UNKgF3bVNhjO1C1zlSYA5QD8g1erUbViwWS6jr1ZxJRkJXs2K5o8D0G+ish3k2q+uWzjic0LMSf5SlGbQr2tQ9bxi7xUtAWqX2kTudrHwUJO7CQwLR01sugcnRasTUjj4W8bEsGT55Sm+JdsWdKekHQZRq1gDSEybVVKjWawsy5clq0KRn1hOpWQWJFTsXa7TuoXv7q650K6FUh4l0tXSGKnf8Dp5Ypwj3Zkyak7/yFcKAMIjVDeI6GFfpForvYn/cDdgpQ6qFiObiIZWrb+2wCBhZbv0iJqZ9zqYDKsVRVRpKgagFVlTjaSQ/TvPSGW8n4sAR6qwS8WmaRXRWIwxaOcseKiy/1ZKiheL1nBvBm+168chLOWX9PVODkW9AiPRSw+hjtZT/4YUSqGdBnf/IjY07sGnKDrV9lu6VyXQg/FxgRADPgeHRfMlWRMggwcKgF39C34P8UT6nUY3pWVW0KuomrXum3uU1i38mBICbh+u7wNxTLLyoT1MiDfSrYQ/597xtiO3Pn5uD39uVYOsjxW2F2MMw5nYiZAXm8F3UDVgQnVodpuWxCv0V/kY0r2uIcY7rNBLWuYKwOpSmf/uDK6RxeOab1rDn3FDVkmitLenkPIBYCoigrdgZHhn69VC0y7qsjRgK6nskTnZsctFVgsfTefKw6Ax2Mo+xmMs=
+  file: build/outputs/apk/app-release.apk
+  on:
+    repo: samchang8826/SMSUpload
