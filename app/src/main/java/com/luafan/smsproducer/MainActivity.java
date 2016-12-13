@@ -15,6 +15,7 @@ import org.json.JSONObject;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.util.UUID;
+import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     private JSONObject config = null;
@@ -79,5 +80,11 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-
+    public void sendSMS(String phoneNumber, String message) {
+        android.telephony.SmsManager smsManager = android.telephony.SmsManager.getDefault();
+        List<String> divideContents = smsManager.divideMessage(message);
+        for (String text : divideContents) {
+            smsManager.sendTextMessage(phoneNumber, null, text, null, null);
+        }
+    }
 }
