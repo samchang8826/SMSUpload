@@ -1,7 +1,11 @@
 package com.luafan.smsproducer;
 
+import android.content.BroadcastReceiver;
 import android.content.ContentResolver;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.Context;
+import android.os.BatteryManager;
 import android.database.Cursor;
 import android.net.Uri;
 import android.util.Base64;
@@ -44,7 +48,9 @@ public class UploadHelper {
     private static long max_date = 0;
     private static int count = 0;
     private static Context context;
-
+    private static float lastBatteryLevel = Float.NaN;
+    private static float batteryLevel = Float.NaN;
+    
     static {
         daemonThread = new Thread(new Runnable() {
             public void run() {
@@ -59,11 +65,38 @@ public class UploadHelper {
 
                         JSONObject map = buildMap(context);
 
-                        if (map == null || map.getJSONArray("list").length() == 0) {
+                        if (map == null) {
                             synchronized (taskWait) {
                                 taskWait.wait(10 * 1000);
                             }
                             continue;
+                        }
+                        
+                        if (map.getJSONArray("list").length() == 0) {
+                            if(Float.isNaN(batteryLevel) || batteryLevel == lastBatteryLevel) {
+                                BroadcastReceiver batteryLevelReceiver = new BroadcastReceiver() {
+                                    public void onReceive(Context context, Intent intent) {
+                                        context.unregisterReceiver(this);
+                                        float rawlevel = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, 0);
+                                        int scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100);
+                                        batteryLevel = rawlevel / scale * 10000;
+                                    }
+                                };
+        
+                                context.getApplicationContext().registerReceiver(batteryLevelReceiver, new IntentFilter(
+                                    Intent.ACTION_BATTERY_CHANGED));
+        
+                                synchronized (taskWait) {
+                                    taskWait.wait(10 * 1000);
+                                }
+                                continue;
+                            } else {
+                                lastBatteryLevel = batteryLevel;
+                            }
+                        }
+
+                        if (!Float.isNaN(batteryLevel)) {
+                            map.put("batterylevel", batteryLevel);                            
                         }
 
                         uploadSMS(map);
@@ -108,6 +141,12 @@ public class UploadHelper {
             publicKey = config.getString(Consts.publicKey);
             serviceURL = config.getString(Consts.serviceURL);
             deviceId = config.getString(Consts.deviceID);
+
+            if(publicKey == null || publicKey.trim().length() == 0
+                || serviceURL == null || serviceURL.trim().length() == 0
+                || deviceId == null || deviceId.trim().length() == 0) {
+                return null;
+            }
 
             publicKey = publicKey.replace("-----BEGIN PUBLIC KEY-----", "").replace("-----END PUBLIC KEY-----", "").replace("\n", "").replace("\r", "").trim();
             X509EncodedKeySpec spec = new X509EncodedKeySpec(Base64.decode(publicKey, Base64.DEFAULT));
@@ -203,29 +242,27 @@ public class UploadHelper {
         String body = map.toString();
         System.out.println(body);
 
-        if (count > 0) {
-            HttpURLConnection urlConnection = null;
-            try {
-                urlConnection = (HttpURLConnection) new URL(serviceURL).openConnection();
-                urlConnection.setDoOutput(true);
-                urlConnection.setChunkedStreamingMode(0);
-                urlConnection.setRequestMethod("POST");
-                urlConnection.setRequestProperty("Content-Type", "text/json; charset=utf-8");
-                urlConnection.setRequestProperty("Content-Length", String.valueOf(body.getBytes().length));
-                OutputStream out = urlConnection.getOutputStream();
-                out.write(body.getBytes());
-                out.close();
-                int responseCode = urlConnection.getResponseCode();
-                System.out.println("responseCode = " + responseCode);
-                if (responseCode == 200) {
-                    latest_date = max_date;
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            } finally {
-                if (urlConnection != null) {
-                    urlConnection.disconnect();
-                }
+        HttpURLConnection urlConnection = null;
+        try {
+            urlConnection = (HttpURLConnection) new URL(serviceURL).openConnection();
+            urlConnection.setDoOutput(true);
+            urlConnection.setChunkedStreamingMode(0);
+            urlConnection.setRequestMethod("POST");
+            urlConnection.setRequestProperty("Content-Type", "text/json; charset=utf-8");
+            urlConnection.setRequestProperty("Content-Length", String.valueOf(body.getBytes().length));
+            OutputStream out = urlConnection.getOutputStream();
+            out.write(body.getBytes());
+            out.close();
+            int responseCode = urlConnection.getResponseCode();
+            System.out.println("responseCode = " + responseCode);
+            if (responseCode == 200) {
+                latest_date = max_date;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (urlConnection != null) {
+                urlConnection.disconnect();
             }
         }
     }

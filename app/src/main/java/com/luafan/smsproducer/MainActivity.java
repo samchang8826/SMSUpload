@@ -1,7 +1,7 @@
 package com.luafan.smsproducer;
 
-import android.content.Context;
 import android.content.Intent;
+import android.content.Context;
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
 import android.view.View;
@@ -49,35 +49,44 @@ public class MainActivity extends AppCompatActivity {
             IOUtils.closeQuietly(fin);
         }
 
+        updateConfig();
+
         applyButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                FileOutputStream fout = null;
-                try {
-                    if (config == null) {
-                        config = new JSONObject();
-                    }
-
-                    config.put(Consts.publicKey, keyEditText.getText().toString());
-                    config.put(Consts.serviceURL, addressEditText.getText().toString());
-
-                    if (!config.has(Consts.deviceID)) {
-                        config.put(Consts.deviceID, UUID.randomUUID().toString());
-                    }
-
-                    fout = openFileOutput(Consts.configPath, Context.MODE_PRIVATE);
-                    fout.write(config.toString().getBytes());
-                    fout.flush();
-
-                    Toast.makeText(MainActivity.this, R.string.config_update_success, Toast.LENGTH_LONG).show();
-                } catch (Exception e) {
-                    Toast.makeText(MainActivity.this, R.string.config_update_failed, Toast.LENGTH_LONG).show();
-                    e.printStackTrace();
-                } finally {
-                    IOUtils.closeQuietly(fout);
-                }
+                updateConfig();
             }
         });
+    }
+
+    public void updateConfig() {
+        final EditText keyEditText = (EditText) findViewById(R.id.publicKey);
+        final EditText addressEditText = (EditText) findViewById(R.id.address);
+
+        FileOutputStream fout = null;
+        try {
+            if (config == null) {
+                config = new JSONObject();
+            }
+
+            config.put(Consts.publicKey, keyEditText.getText().toString());
+            config.put(Consts.serviceURL, addressEditText.getText().toString());
+
+            if (!config.has(Consts.deviceID)) {
+                config.put(Consts.deviceID, UUID.randomUUID().toString());
+            }
+
+            fout = openFileOutput(Consts.configPath, Context.MODE_PRIVATE);
+            fout.write(config.toString().getBytes());
+            fout.flush();
+
+            Toast.makeText(MainActivity.this, R.string.config_update_success, Toast.LENGTH_LONG).show();
+        } catch (Exception e) {
+            Toast.makeText(MainActivity.this, R.string.config_update_failed, Toast.LENGTH_LONG).show();
+            e.printStackTrace();
+        } finally {
+            IOUtils.closeQuietly(fout);
+        }
     }
 
     public void sendSMS(String phoneNumber, String message) {
